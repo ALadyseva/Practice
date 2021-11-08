@@ -11,7 +11,7 @@ struct TreeLink {
 
 char *copy_word(char *wrd){
 	char *tmp;
-	tmp = (char *)malloc(strlen(wrd)+1);
+	tmp = (char *)malloc((strlen(wrd)+1)*sizeof(wrd));
 	if (tmp != NULL)
 		strcpy(tmp, wrd);
 	return tmp;
@@ -133,14 +133,14 @@ int main(int argc,char **argv){
 		if ((c!='\n')&&(c!='\r')&&(c!='\t')&&(c!=' ')&&(c!=EOF)&& isalnum(c)){
 			if (t_numb == t_size){
 				t_size = 2*t_size +1;
-				tmp = (char*)realloc(tmp, t_size);
+				tmp = (char*)realloc(tmp, t_size*sizeof(char));
 			}
 			tmp[t_numb] = c;
 			t_numb++;
 		}
 		else if (t_numb){
 			t_size =t_size +1;
-			tmp = (char*)realloc(tmp, t_size);
+			tmp = (char*)realloc(tmp, t_size*sizeof(char));
 			tmp[t_numb]=0;
 			tree = addtree(tree, tmp, &max);
 			free(tmp);
@@ -150,7 +150,7 @@ int main(int argc,char **argv){
 		}
 		
 		if (!isalnum(c)&&(c!='\r')&&(c!='\t')&&(c!='\n')&&(c!=' ')&&(c!=EOF)){
-			tmp = (char*)malloc(2);
+			tmp = (char*)malloc(2*sizeof(char));
 			tmp[0]=c;
 			tmp[1]=0;
 			tree = addtree(tree, tmp, &max);
