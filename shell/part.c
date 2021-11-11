@@ -176,5 +176,7 @@ int main()
 		buf[word_len++]=c;	
 	}
 	cleaning (&head);
+	if (buf)
+		free(buf);
 	return 0;
 }
