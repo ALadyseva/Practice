@@ -39,12 +39,12 @@ char **free_ar(char **ar)
     return NULL;
 }
 
-void free_list(struct item **head,int i)
+void free_list(struct item ***head,int i)
 {
     struct item *q;
-    while (head[i]){
-        q = head[i];
-        head[i] = head[i]->next;
+    while ((*head)[i]){
+        q = (*head)[i];
+        (*head)[i] = (*head)[i]->next;
         free(q->data);
         free(q);
     }
@@ -96,45 +96,7 @@ void openning_in(struct flags **flag,char **ar, int*fd2,int *save2)
         }
     }
 }
-void openning_in_conv(struct flags **flag,char **ar, int*fd2,int *save2)
-{
-    if ((*flag)->in==1){
-        *fd2=open(ar[1],O_RDONLY);
-        if (*fd2==-1){
-            printf("Error with openning file\n");
-            _exit(2);
-        }
-        else{
-            *save2=dup(0);
-            dup2(*fd2,0);
-        }
-    }
-}
-void openning_out_conv(struct flags **flag,char **ar,int *fd1, int *save1)
-{
-    if ((*flag)->out==1){
-        *fd1=open(ar[0],O_CREAT|O_TRUNC|O_WRONLY,0666);
-        if (*fd1==-1){
-            printf("Error with openning file\n");
-            _exit(2);
-        }
-        else{
-            *save1=dup(1);
-            dup2(*fd1,1);
-        }
-    }
-    if ((*flag)->out==2){
-        *fd1=open(ar[0],O_CREAT|O_APPEND|O_WRONLY,0666);
-        if (*fd1==-1){
-            printf("Error with openning file\n");
-            _exit(2);
-        }
-        else{
-            *save1=dup(1);
-            dup2(*fd1,1);
-        }
-    }
-}
+
 void openning_out(struct flags **flag,char **ar,int *fd1, int *save1)
 {
     if ((*flag)->out==1){
@@ -186,7 +148,7 @@ void execution(int k,struct item **p, int i)
 void work(struct item **p,struct flags **flag,char **ar)
 {
     char **pv=NULL;
-    int cd_flag =0,r,k,pid=0,fd1,fd2, save1, save2;
+    int cd_flag =0,r,k,pid=0,fd1=0,fd2=0, save1, save2;
     check(p[0],&k);
     openning_in(flag,ar,&fd2,&save2);
     openning_out(flag,ar,&fd1,&save1);
@@ -207,7 +169,7 @@ void work(struct item **p,struct flags **flag,char **ar)
                     r=wait(NULL);
             }
         }
-        free_list(p,0);
+        free_list(&p,0);
         free(pv);
     }
     closing_in(flag,&fd2,&save2);
@@ -220,7 +182,7 @@ void waiting_conv(int *pids_num,struct flags **flag,int *ar_pid)
         r=wait(NULL);
         for (i=0;i<(*flag)->op_num+1;i++){
             if ((ar_pid[i]==r)&&(r>0)){
-               (*pids_num)--;
+                (*pids_num)--;
                 ar_pid[i]=0;
             }
         }
@@ -230,14 +192,14 @@ void waiting_conv(int *pids_num,struct flags **flag,int *ar_pid)
 void conv(struct item **p,struct flags **flag,char **ar)
 {
     int *ar_pid=NULL,fd[2],saved_fd,cd_flag=0,k,fd1,fd2,save1,save2,i,pids_num=0;
-    ar_pid=malloc(((*flag)->op_num)*sizeof(*ar_pid));
+    ar_pid=malloc(((*flag)->op_num+1)*sizeof(int));
     for (i = 0; i < (*flag)->op_num; i++) {
         pipe(fd);
         pids_num++;
         ar_pid[i] = fork();
         if (ar_pid[i]==0) {  /*child*/
             if ((i==0)&&((*flag)->in>0))
-                openning_in_conv(flag,ar,&fd2,&save2);
+                openning_in(flag,ar,&fd2,&save2);
             if (i!=0){
                 dup2(saved_fd,0);
                 close(saved_fd);
@@ -252,7 +214,7 @@ void conv(struct item **p,struct flags **flag,char **ar)
             close(saved_fd);
         close(fd[1]);
         saved_fd=fd[0];
-        free_list(p,i);
+        free_list(&p,i);
     }
     ar_pid[(*flag)->op_num] = fork();
     pids_num++;
@@ -260,10 +222,10 @@ void conv(struct item **p,struct flags **flag,char **ar)
         check(p[(*flag)->op_num],&k);
         dup2(saved_fd,0);
         close(saved_fd);
-        openning_out_conv(flag,ar,&fd1,&save1);
+        openning_out(flag,ar,&fd1,&save1);
         execution(k,p,(*flag)->op_num);
     }
-    free_list(p,(*flag)->op_num);
+    free_list(&p,(*flag)->op_num);
     close(saved_fd);
     if (((*flag)->fon_flag==0)&&(cd_flag==0))
         waiting_conv(&pids_num,flag,ar_pid);
@@ -273,19 +235,14 @@ void conv(struct item **p,struct flags **flag,char **ar)
 
 int new_buf(char **p,int len)
 {
-    char *buf;
-    buf=malloc(2*len*sizeof(buf));
-    strncpy(buf,*p,len);
-    free (*p);
-    *p=buf;
-    buf=NULL;
-    return 2*len;
+        *p=realloc(*p, 2*len*sizeof(char));
+	return 2*len;
 }
 
 struct item *buf_to_list(struct item *head, char *buf, struct flags **flag)
 {
     if ((*flag)->word_len!=0){
-        if (head==NULL) {
+        if (!head) {
             head=malloc(sizeof(*head));
             head->data=malloc(((*flag)->word_len+1)*sizeof(head->data));
             strncpy(head->data,buf,(*flag)->word_len+1);
@@ -314,10 +271,8 @@ int err(struct item **p, struct flags **flag)
         printf("Error when use > or < with |\n");
     if ((*flag)->err_flag==7)
         printf("Error when use |\n");
-    if ((*flag)->err_flag==8)
-        printf("Syntax error befor |\n");
     for (i=0;i<=(*flag)->op_num;i++)
-        free_list(p,i);
+        free_list(&p,i);
     printf(">");
     (*flag)->word_len=0;
     (*flag)->in=0;
@@ -352,8 +307,21 @@ int endlist (struct item **head, char *buf, struct flags **flag,char **ar)
     int p,status;
     endbuf(head,buf,flag,ar);
     p=wait4(-1,&status,WNOHANG,NULL);
-    while (p>0)
+    if (WIFEXITED(status)){
+	printf("Command with PID number %d is done, status: %d\n", p, status);
+    }
+    else {
+	printf("Command with PID number %d is done with error\n", p);
+    }
+    while (p>0){
         p=wait4(-1,&status,WNOHANG,NULL);
+	if (WIFEXITED(status)){
+		printf("Command with PID number %d is done, status: %d\n", p, status);
+        }
+        else {
+		printf("Command with PID number %d is done with error\n", p);
+        }
+    }
     if ((*flag)->n_dir!=0){
         (*flag)->err_flag=5;
         (*flag)->kol=err(head,flag);
@@ -367,9 +335,6 @@ int endlist (struct item **head, char *buf, struct flags **flag,char **ar)
         printf(">");
         (*flag)->word_len=0;
     }
-    p=wait4(-1,&status,WNOHANG,NULL);
-    while (p>0)
-        p=wait4(-1,&status,WNOHANG,NULL);
     return 0;
 }
 
@@ -457,10 +422,8 @@ void ending_buf(struct item **head, char *buf, struct flags **flag,char **ar)
     (*flag)->err_flag=maximum(err_n,(*flag)->err_flag);
 }
 
-void new_op(int *c,struct flags **flag, struct item **head)
+void new_op(int *c,struct flags **flag)
 {
-    if (head[(*flag)->op_num]==NULL)
-        (*flag)->err_flag=8;
     (*flag)->op_num++;
     if ((*flag)->out>0)
         (*flag)->err_flag=6;
@@ -477,7 +440,7 @@ struct item **newhead(struct item ***head,int*head_size)
     struct item **head1 = NULL;
     int i;
     *head_size=*head_size*2;
-    head1=malloc(7*sizeof(*head1));
+    head1=malloc(*head_size*sizeof(*head1));
     for (i=0;i<(*head_size/2);i++)
         head1[i]=(*head)[i];
     free(*head);
@@ -488,14 +451,16 @@ int main()
 {
     struct item **head = NULL;
     struct flags *flag=NULL;
-    int buf_len=5,c, head_size=1;
+    int buf_len=5,c, head_size=7;
     char *buf;
+    int i;
     char **ar=NULL;
     flag=make_flag(flag);
     ar=make_ar(ar);
     buf=malloc(buf_len*sizeof(*buf));
     printf(">");
     head=malloc(7*sizeof(*head));
+    head[0]=NULL;
     while ((c=getchar())!=EOF){
         if ((flag->fon_flag!=0)&&(c!='\n'))
             flag->err_flag=2;
@@ -506,7 +471,8 @@ int main()
                 ending_buf(head, buf,&flag,ar);
                 if (flag->op_num== head_size-1)
                     head=newhead(&head,&head_size);
-                new_op(&c,&flag,head);
+                new_op(&c,&flag);
+		head[flag->op_num]=0;
             }
             if ((c=='>')||(c=='<')){
                 ending_buf(head, buf,&flag,ar);
@@ -535,7 +501,11 @@ int main()
         }
         buf[flag->word_len++]=c;
     }
+    for (i=0; i<flag->op_num; i++)
+	free_list(&head,i);
     ar=free_ar(ar);
+    free(head);
     free(flag);
+    free(buf);
     return 0;
 }
